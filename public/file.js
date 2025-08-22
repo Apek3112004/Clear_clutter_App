@@ -1,13 +1,8 @@
 const pathForm = document.getElementById("pathForm");
-
 const organizeForm = document.getElementById("organizeForm");
-
 const hiddenBasepath = document.getElementById("hiddenBasepath");
-
 const previewResult = document.getElementById("preview-result");
-
 const dropZone = document.getElementById("drop-zone");
-
 
 // Handle organize form submit
 organizeForm.addEventListener("submit", async (e) => {
@@ -24,7 +19,6 @@ organizeForm.addEventListener("submit", async (e) => {
   const copyInstead = document.getElementById("copyInstead").checked;
 
   const customFolders = {};
-
   if (customFoldersRaw) {
     customFoldersRaw.split(",").forEach(pair => {
       const [ext, folder] = pair.split("=").map(s => s.trim());
@@ -33,28 +27,23 @@ organizeForm.addEventListener("submit", async (e) => {
   }
 
   try {
-    // 🔍 Get files to organize
+    // Fetch preview list first
     const previewRes = await fetch("/preview", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ basepath, customFolders }),
     });
-
     const previewData = await previewRes.json();
-
     if (!previewRes.ok) throw new Error(previewData.message || "Preview failed");
 
-    const totalFiles = previewData.length;
+    const allFiles = previewData.map(f => f.file);
     const batchSize = 10;
-    const totalBatches = Math.ceil(totalFiles / batchSize);
+    const totalBatches = Math.ceil(allFiles.length / batchSize);
 
-    console.log(`📦 Total files: ${totalFiles}, Batches: ${totalBatches}`);
-
-    // Show progress bar UI
+    // Progress UI
     const progressContainer = document.getElementById("progress-container");
     const progressBar = document.getElementById("progress-bar");
     const progressText = document.getElementById("progress-text");
-
     const summaryDiv = document.getElementById("organize-summary");
     const summaryMoved = document.getElementById("summary-moved");
     const summaryCopied = document.getElementById("summary-copied");
@@ -66,33 +55,22 @@ organizeForm.addEventListener("submit", async (e) => {
     progressText.textContent = "Starting...";
     summaryDiv.style.display = "none";
 
-    // Initialize summary counters
-    let totalMoved = 0;
-    let totalCopied = 0;
-    let totalDuplicates = 0;
-    let totalBytes = 0;
+    let totalMoved = 0, totalCopied = 0, totalDuplicates = 0, totalBytes = 0;
 
     for (let batchNumber = 0; batchNumber < totalBatches; batchNumber++) {
+      const batchFiles = allFiles.slice(batchNumber * batchSize, (batchNumber + 1) * batchSize);
+
       progressText.textContent = `Processing batch ${batchNumber + 1} of ${totalBatches}...`;
 
       const res = await fetch("/organize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          basepath,
-          excludeExt,
-          customFolders,
-          copyInstead,
-          batchSize,
-          batchNumber,
-        }),
+        body: JSON.stringify({ basepath, excludeExt, customFolders, copyInstead, files: batchFiles }),
       });
 
       const data = await res.json();
-
       if (!res.ok) throw new Error(data.message || "Organize failed");
 
-      // Accumulate summary counts from backend
       if (data.summary) {
         totalMoved += data.summary.filesMovedCount || 0;
         totalCopied += data.summary.filesCopiedCount || 0;
@@ -100,25 +78,17 @@ organizeForm.addEventListener("submit", async (e) => {
         totalBytes += data.summary.totalBytesProcessed || 0;
       }
 
-      const progressPercent = Math.round(((batchNumber + 1) / totalBatches) * 100);
-      progressBar.style.width = `${progressPercent}%`;
+      progressBar.style.width = `${Math.round(((batchNumber + 1) / totalBatches) * 100)}%`;
     }
 
     progressText.textContent = "✅ Organizing complete!";
-
-    // Show summary
     summaryMoved.textContent = `Files moved: ${totalMoved}`;
     summaryCopied.textContent = `Files copied: ${totalCopied}`;
     summaryDuplicates.textContent = `Duplicates deleted: ${totalDuplicates}`;
-    summaryBytes.textContent = `Total size processed: ${(totalBytes / (1024 * 1024)).toFixed(2)} MB`;
-
+    summaryBytes.textContent = `Total size processed: ${(totalBytes / (1024*1024)).toFixed(2)} MB`;
     summaryDiv.style.display = "block";
 
-    localStorage.setItem("showBatchSuccess", "true");
-
-    setTimeout(() => {
-      window.location.href = "/done.html";
-    }, 2000); // delay to show summary before redirect
+    setTimeout(() => { window.location.href = "/done.html"; }, 2000);
 
   } catch (error) {
     console.error("❌ Organize failed:", error);
@@ -126,20 +96,14 @@ organizeForm.addEventListener("submit", async (e) => {
   }
 });
 
-
 // Handle preview form submit
 pathForm.addEventListener("submit", async (e) => {
   e.preventDefault();
 
   const basepath = document.getElementById("basepath").value.trim();
-
   if (!basepath) return alert("Please enter a folder path.");
 
   previewResult.innerHTML = "<p>Loading preview...</p>";
-
-  // 🔍 Debug log
-  console.log("🔎 SUBMITTING /preview");
-  console.log("📂 basepath:", basepath);
 
   try {
     const response = await fetch("/preview", {
@@ -149,64 +113,48 @@ pathForm.addEventListener("submit", async (e) => {
     });
 
     const data = await response.json();
+    if (!response.ok) throw new Error(data.message || "Preview failed");
 
-    if (!response.ok) {
-      console.error("❌ Preview failed:", data);
-      throw new Error(data.message || "Unknown error");
-    }
-
-    console.log("✅ Preview response:", data);
-
-    if (data.length === 0) {
-      previewResult.innerHTML =
-        "<p>No files to organize or only js/json files present.</p>";
+    if (!data.length) {
+      previewResult.innerHTML = "<p>No files to organize or only js/json files present.</p>";
       organizeForm.style.display = "none";
       return;
     }
 
     previewResult.innerHTML = "<h3>Preview of files to be organized:</h3>";
-
     const ul = document.createElement("ul");
-
     data.forEach(({ file, targetFolder }) => {
       const li = document.createElement("li");
       li.textContent = `${file} → ${targetFolder}/`;
       ul.appendChild(li);
     });
-
     previewResult.appendChild(ul);
 
     hiddenBasepath.value = basepath;
     organizeForm.style.display = "block";
-
   } catch (error) {
     console.error("❌ Error in preview:", error);
-
     previewResult.innerHTML = `<p style="color:red;">Error: ${error.message}</p>`;
     organizeForm.style.display = "none";
   }
 });
 
-
-// ✅ Drag & drop event listeners
+// Drag & drop
 dropZone.addEventListener("dragover", (e) => {
   e.preventDefault();
   dropZone.classList.add("dragover");
 });
-
 
 dropZone.addEventListener("dragleave", (e) => {
   e.preventDefault();
   dropZone.classList.remove("dragover");
 });
 
-
 dropZone.addEventListener("drop", (e) => {
   e.preventDefault();
   dropZone.classList.remove("dragover");
 
   const existingMsg = document.querySelector(".drop-warning");
-
   if (existingMsg) existingMsg.remove();
 
   const items = e.dataTransfer.items;
@@ -222,27 +170,15 @@ dropZone.addEventListener("drop", (e) => {
 
   if (folderDetected) {
     const msg = document.createElement("p");
-
     msg.className = "drop-warning";
     msg.style.color = "orange";
     msg.style.marginTop = "10px";
     msg.style.fontWeight = "500";
     msg.style.transition = "opacity 0.5s ease";
     msg.style.opacity = "0";
-
-    msg.textContent =
-      "⚠️ Folder drag & drop is limited in browsers. Please copy-paste the folder path instead.";
-
+    msg.textContent = "⚠️ Folder drag & drop is limited in browsers. Please copy-paste the folder path instead.";
     dropZone.appendChild(msg);
-
-    requestAnimationFrame(() => {
-      msg.style.opacity = "1";
-    });
-
-    setTimeout(() => {
-      msg.style.opacity = "0";
-
-      setTimeout(() => msg.remove(), 500);
-    }, 5000);
+    requestAnimationFrame(() => { msg.style.opacity = "1"; });
+    setTimeout(() => { msg.style.opacity = "0"; setTimeout(() => msg.remove(), 500); }, 5000);
   }
 });

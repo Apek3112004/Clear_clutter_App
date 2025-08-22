@@ -5,7 +5,7 @@ import fs from "fs/promises";
 import fsn from "fs";
 import { getFileHash, organizeFiles } from "./services/FileOrganizer.js";
 import { deleteEmptyFolders } from "./services/DeleteEmptyFolders.js";
-import { app } from "electron"; // <--- import Electron app
+import { app } from "electron";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -52,14 +52,7 @@ router.post("/preview", async (req, res) => {
 });
 
 router.post("/organize", async (req, res) => {
-  const {
-    basepath,
-    excludeExt = [],
-    customFolders = {},
-    copyInstead = false,
-    batchSize,
-    batchNumber
-  } = req.body;
+  const { basepath, files = [], excludeExt = [], customFolders = {}, copyInstead } = req.body;
 
   if (isForbiddenPath(basepath)) {
     return res.status(400).send("❌ Operation not allowed on protected system folders.");
@@ -68,16 +61,21 @@ router.post("/organize", async (req, res) => {
   req.session.logs = req.session.logs || [];
   req.session.lastMoved = req.session.lastMoved || [];
 
+  if (!files.length) {
+    return res.status(400).send({ message: "No files provided to organize." });
+  }
+
   try {
+    // Process only the files sent in this batch
     const summary = await organizeFiles(
-      { basepath, excludeExt, customFolders, copyInstead, batchSize, batchNumber },
+      { basepath, excludeExt, customFolders, copyInstead, batchSize: files.length, batchNumber: 0, filesToProcess: files },
       req.session
     );
 
     await deleteEmptyFolders(basepath, req.session.logs);
 
     res.json({
-      message: "✅ Organizing complete",
+      message: "✅ Batch organizing complete",
       logs: req.session.logs,
       summary,
     });
@@ -90,7 +88,7 @@ router.post("/organize", async (req, res) => {
 // ✅ Fixed download-logs for packaged app
 router.get("/download-logs", async (req, res) => {
   try {
-    const logDir = app.getPath("userData"); // write outside ASAR
+    const logDir = app.getPath("userData");
     const logFile = path.join(logDir, "logs.txt");
 
     await fs.writeFile(logFile, (req.session.logs || []).join("\n"));
@@ -103,9 +101,9 @@ router.get("/download-logs", async (req, res) => {
 router.post("/undo", async (req, res) => {
   try {
     for (const move of (req.session.lastMoved || []).reverse()) {
-      if (fsn.existsSync(move.from)) {
-        await fs.rename(move.from, move.to);
-        req.session.logs.push(`↩️ Undid: ${path.basename(move.from)} moved back`);
+      if (fsn.existsSync(move.to)) {
+        await fs.rename(move.to, move.from);
+        req.session.logs.push(`↩️ Undid: ${path.basename(move.to)} moved back`);
       }
     }
     req.session.lastMoved = [];
