@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Operation Complete - Clutter Clear</title>
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600&display=swap" rel="stylesheet" />
+  <link href="./done.css" rel="stylesheet" />
+</head>
+<body>
+
+  <!-- Floating balloons -->
+  <div class="balloon"></div>
+  <div class="balloon"></div>
+  <div class="balloon"></div>
+  <div class="balloon"></div>
+
+  <canvas id="confetti-canvas"></canvas>
+
+  <div class="container">
+    <h1>🎉 Operation Complete!</h1>
+    <p>Your files have been organized successfully.</p>
+
+    <form action="/undo" method="POST" style="display: inline-block;">
+      <button type="submit">Undo Last Operation</button>
+    </form>
+
+    <a href="/">Go Back</a>
+  </div>
+
+  <!-- Success Modal -->
+  <div id="successModalOverlay" role="dialog" aria-modal="true" aria-labelledby="modalTitle" aria-describedby="modalDesc">
+    <div id="successModal">
+      <h2 id="modalTitle">Success!</h2>
+      <p id="modalDesc">Your files have been organized successfully.</p>
+      <button id="closeModalBtn" aria-label="Close success message">Close</button>
+    </div>
+  </div>
+
+  <script>
+    // Show the modal on page load
+    window.addEventListener("load", () => {
+      const modalOverlay = document.getElementById('successModalOverlay');
+      const closeBtn = document.getElementById('closeModalBtn');
+
+      // Show modal
+      modalOverlay.classList.add('show');
+
+      // Close modal handler
+      function closeModal() {
+        modalOverlay.classList.remove('show');
+      }
+
+      closeBtn.addEventListener('click', closeModal);
+
+      // Optional: auto close modal after 5 seconds
+      setTimeout(closeModal, 5000);
+    });
+
+    // Simple confetti effect
+    (() => {
+      const canvas = document.getElementById('confetti-canvas');
+      const ctx = canvas.getContext('2d');
+      let W, H;
+      let confetti = [];
+
+      function resize() {
+        W = window.innerWidth;
+        H = window.innerHeight;
+        canvas.width = W;
+        canvas.height = H;
+      }
+      window.addEventListener('resize', resize);
+      resize();
+
+      class ConfettiParticle {
+        constructor() {
+          this.x = Math.random() * W;
+          this.y = Math.random() * -H;
+          this.size = Math.random() * 8 + 4;
+          this.speed = Math.random() * 3 + 2;
+          this.angle = Math.random() * 360;
+          this.spin = Math.random() * 0.1 + 0.01;
+          this.color = `hsl(${Math.random() * 360}, 70%, 60%)`;
+          this.tilt = Math.random() * 15;
+        }
+        update() {
+          this.y += this.speed;
+          this.angle += this.spin;
+          if (this.y > H) {
+            this.y = -10;
+            this.x = Math.random() * W;
+          }
+        }
+        draw(ctx) {
+          ctx.save();
+          ctx.translate(this.x, this.y);
+          ctx.rotate(this.angle);
+          ctx.fillStyle = this.color;
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.lineTo(this.size / 2, this.tilt);
+          ctx.lineTo(this.size, 0);
+          ctx.lineTo(this.size / 2, -this.tilt);
+          ctx.closePath();
+          ctx.fill();
+          ctx.restore();
+        }
+      }
+
+      for (let i = 0; i < 150; i++) {
+        confetti.push(new ConfettiParticle());
+      }
+
+      function animate() {
+        ctx.clearRect(0, 0, W, H);
+        confetti.forEach(c => {
+          c.update();
+          c.draw(ctx);
+        });
+        requestAnimationFrame(animate);
+      }
+
+      animate();
+    })();
+  </script>
+</body>
+</html>
