@@ -1,138 +1,265 @@
-main.js → Electron lifecycle, windows, and app startup
-index.js → Backend setup (Express app, middleware, sessions, static files)
-routes.js → API endpoints (actual file-organizing logic)
+Clear the Clutter
+
+Declutter any folder in seconds. Clear the Clutter scans a selected directory, previews an organization plan, moves files into tidy categories, detects and removes duplicates (via SHA-256), lets you undo the last operation safely, and exports downloadable logs for auditing.
+
+Built with Node.js + Express. Works on Windows, Linux, and macOS.
+
+<p align="center"> <!-- Badges are optional; enable if you add the corresponding config --> <img alt="Node" src="https://img.shields.io/badge/Node-18+-339933?logo=node.js&logoColor=white"> <img alt="Express" src="https://img.shields.io/badge/Express-4.x-000000?logo=express&logoColor=white"> <img alt="License" src="https://img.shields.io/badge/license-MIT-blue"> </p>
+✨ Features
+
+Drag-and-drop or folder picker to choose the root directory
+
+Preview first (dry-run) — see what will move where before committing
+
+Smart organization by extension/category (Images, Video, Docs, Code, Archives, etc.)
+
+Duplicate detection with streamed SHA-256 hashing and safe handling
+
+Undo last operation (atomic move log → reverse)
+
+Downloadable logs (JSON/CSV) for each run
+
+Cross-platform paths with robust safety checks (never escapes selected root)
+
+Progress + summary (files scanned, moved, duplicates found, time taken)
+
+🖼️ Screens / Demo
+
+(Optional: add GIFs or screenshots here)
+docs/preview.gif – Preview run
+docs/organize.gif – Organize + Undo
+docs/logs.png – Logs download
+
+🧱 Tech Stack
+
+Backend: Node.js, Express
+
+File Ops: fs, path, crypto (SHA-256 via streamed hashing)
+
+Data: In-memory plan + per-run log files (JSON/CSV). (Optional: SQLite/LevelDB for very large folders.)
+
+Testing: Jest (suggested), mock-fs
+
+CI: GitHub Actions (suggested)
+
+🗂️ Project Structure
+clear_clutter_app/
+├─ backend/
+│  ├─ routes/
+│  │  ├─ preview.js        # builds dry-run plan
+│  │  ├─ organize.js       # executes plan safely + logs
+│  │  ├─ undo.js           # reverses last operation
+│  │  └─ logs.js           # lists/serves downloadable logs
+│  ├─ services/
+│  │  ├─ scanner.js        # walk directory, build catalog
+│  │  ├─ hasher.js         # SHA-256 streaming hash
+│  │  ├─ planner.js        # decide destinations by rules
+│  │  └─ executor.js       # atomic move/copy, progress callbacks
+│  ├─ utils/
+│  │  ├─ categories.js     # extension → category map
+│  │  └─ paths.js          # path safety, normalization
+│  └─ index.js             # Express app entrypoint
+├─ public/                 # (if you have a frontend)
+├─ logs/                   # per-run logs (created at runtime)
+├─ .env.example
+├─ package.json
+└─ README.md
+
+🧭 How It Works (High-Level)
+[Scan] → [Hash (optional dedupe)] → [Plan] → (Preview shown)
+                                   └── If OK → [Execute] → [Log every move]
+                                                        → [Undo uses the log]
 
 
-1️⃣ main.js – The Electron “Entry Point”
+Scan: Walks the selected directory, collecting file metadata.
 
-This is the first file that runs when the Electron app starts.
+Hash: Streams file contents to compute SHA-256 (skips rehash if size+mtime unchanged).
 
-Responsibilities:
+Plan: Proposes target paths by category and flags duplicates.
 
-Task	Explanation
-Create the main window (BrowserWindow)	Sets up a window of 1200x800 px to display your frontend.
-Load frontend	In dev: load http://localhost:3000 (React dev server). In packaged: load index.html inside ASAR.
-Start backend server	Starts Express backend (backendApp.listen(PORT)) so frontend can make API calls.
-Wait for backend in dev	Uses waitForServer() to ping backend until ready (avoids API failures).
-Handle app lifecycle	activate, window-all-closed, quit events, following macOS/Windows conventions.
+Execute: Performs atomic moves/copies, never leaving the selected root.
 
-Summary: main.js is the bridge between Electron frontend and backend, and manages the app lifecycle and windows.
+Undo: Replays the last run’s log in reverse to restore originals.
 
+⚙️ Setup
+Prerequisites
 
-2️⃣ backend/index.js – Express App Initialization
+Node.js 18+ and npm or pnpm/yarn
 
-This is your backend server entry point.
+Install
+git clone https://github.com/Apek3112004/Clear_clutter_App.git
+cd Clear_clutter_App
+npm install
 
-Responsibilities:
+Configure
 
-Task	Explanation
-Create Express app	const app = express()
-Middleware	Sets up body parsing (express.json()), session handling (express-session), static files (express.static), and rate limiting (express-rate-limit).
-Session logs	Session management for logs and undo functionality.
-Mount routes	Uses router from routes.js (app.use("/", router)) to handle actual endpoints.
-Export app	Exports app without listening, so Electron’s main.js can start it programmatically.
+Create a .env from the example and adjust as needed:
 
-Summary: backend/index.js initializes your backend app, sets middleware, sessions, and links routes.
-
-3️⃣ backend/routes.js – Express Routes / API Endpoints
-
-This handles actual requests from the frontend (Electron window).
-
-Key routes:
-
-Route	Purpose
-GET /	Serve index.html (frontend)
-POST /preview	Scan a folder and preview how files will be organized without moving them.
-POST /organize	Move or copy files based on user rules, logs actions, deletes empty folders.
-GET /download-logs	Write session logs to userData/logs.txt and send to user for download.
-POST /undo	Undo the last organize operation by moving files back and updating logs.
-
-Summary: routes.js is the API layer that actually manipulates files and communicates with frontend.
-
-Overall Flow / Architecture
-
-User opens app → Electron launches main.js
-
-main.js → starts backend (index.js) and opens frontend window
-
-Frontend sends requests:
-
-/preview → shows what files would be moved
-
-/organize → actually moves/copies files
-
-/undo → reverses last move
-
-/download-logs → saves session logs outside ASAR and downloads
-
-Backend (routes.js) handles requests, updates session logs, manages undo
-
-Electron frontend displays logs, file previews, and status messages
+cp .env.example .env
 
 
-=> Session management :-
-Session ID generation:
+.env keys (suggested):
 
-The secret in .env (or fallback-secret) does not directly become the session ID.
-
-Instead, the secret is used to sign the session ID cookie to prevent tampering.
-
-The session ID itself is a unique random string generated by express-session for each new session.
-
-Where the session ID is stored:
-
-The session ID is sent to the client (Electron window) as a cookie.
-
-Electron automatically stores cookies for that session (just like a browser).
-
-On subsequent requests, the cookie is sent back to the backend, so Express can retrieve the corresponding session data on the server.
-
-Session data storage:
-
-The actual session data (req.session.logs, req.session.lastMoved, etc.) is stored server-side (in memory by default).
-
-Only the session ID is kept client-side in the cookie.
-
-In Electron, the session ID cookie is stored in the renderer process’s cookie store, which is managed by Chromium (the browser engine underlying Electron).
-
-Scalability:-Tens of thousands to a few million files → in-memory Map is fine.
-Beyond ~5–10 million files → switch to persistent storage (database) to avoid crashes and memory issues.The Map in your Node.js project is stored entirely in memory (RAM) while your program is running.
-
-It exists only during the runtime of your Node.js process.
-
-Once the program stops, restarts, or crashes, the Map is lost.
-
-Each key-value pair takes up some memory, depending on the size of the key (here, the SHA-256 hash, 32 bytes) and the value (file path string, depends on length).
-
-Map in memory = RAM usage
-Key (hash)  → 32 bytes
-Value (file path string) → varies
-Number of entries × (key + value size) ≈ total RAM used
-A string in JavaScript is stored as a sequence of UTF-16 code units.
-
-Each character typically takes 2 bytes in memory (though Node.js may optimize for ASCII).
-
-So the memory used by the value depends on the length of the file path.
-Path: "/Users/apeksha/Documents/pdf/one.txt" → 34 characters
-Memory: 34 × 2 bytes ≈ 68 bytes
+PORT=5173
+LOG_DIR=./logs
+# Optional performance/safety toggles
+MAX_CONCURRENCY=8
+HASH_BUFFER_SIZE=1048576
 
 
-->Since we are storing file hashes (32 bytes each) and file paths (depending on length, say ~50–100 bytes each) in memory using a Map, on a typical machine with a few GBs of RAM, the system can comfortably handle up to around a million files. Beyond that, it would be more efficient to use a persistent storage solution like a database to avoid memory overflow and improve scalability
+If you plan to keep logs outside the repo, set LOG_DIR to an OS-safe path (e.g., %APPDATA%/ClearClutter/logs or ~/Library/Application Support/ClearClutter/logs).
 
-1 GB = 1,073,741,824 bytes (i.e., 1024^3 bytes). ✅
+▶️ Run
 
-So if each file hash is 32 bytes, you can roughly calculate how many file hashes fit in 1 GB.
+Development
 
-Number of hashes≈33,554,432
+npm run dev
 
-That’s over 33 million hashes just for the SHA-256 values alone. If you include file paths and Map overhead, the practical limit will be lower, but it still confirms that handling up to a million files in memory is very safe.
 
-| Component                                              | Approximate Memory per File                                                          |
-| ------------------------------------------------------ | ------------------------------------------------------------------------------------ |
-| SHA-256 hash (`seenHashes` key)                        | 32 bytes                                                                             |
-| File path string (`seenHashes` value)                  | \~150 bytes (depends on folder depth, average 50–100 chars → 2 bytes per char in JS) |
-| `session.lastMoved` object (2 paths + object overhead) | \~250 bytes                                                                          |
-| `session.logs` entry (log message)                     | \~100 bytes                                                                          |
-| Internal JS Map/Array overhead                         | \~50 bytes                                                                           |
+Production
 
-Total per file ≈ 32 + 150 + 250 + 100 + 50 = ~582 bytes
+npm run build   # if you bundle a frontend
+npm start
+
+
+The server runs on http://localhost:5173 by default (configurable via PORT).
+
+🧪 Quick Start (API)
+
+Replace ROOT with the absolute path you want to organize. These endpoints are examples; adjust paths if your routes differ.
+
+1) Preview (Dry-Run)
+curl -X POST http://localhost:5173/api/preview \
+  -H "Content-Type: application/json" \
+  -d '{"root":"C:/Users/Apeksha/Downloads","dedupe":true}'
+
+
+Response (truncated):
+
+{
+  "summary": { "files": 1207, "moves": 980, "duplicates": 227 },
+  "planId": "2025-08-29T08-45-02Z_9b2f",
+  "moves": [
+    {"from":".../photo001.jpg","to":".../Images/photo001.jpg"},
+    {"from":".../report.pdf","to":".../Documents/report.pdf"}
+  ],
+  "dupes": [
+    {"keep":".../photo001.jpg","remove":".../photo001 (1).jpg","hash":"sha256:..."}
+  ]
+}
+
+2) Organize (Execute Plan)
+curl -X POST http://localhost:5173/api/organize \
+  -H "Content-Type: application/json" \
+  -d '{"planId":"2025-08-29T08-45-02Z_9b2f"}'
+
+
+Returns progress and a runId for logs/undo.
+
+3) Undo Last Operation
+curl -X POST http://localhost:5173/api/undo \
+  -H "Content-Type: application/json" \
+  -d '{"runId":"2025-08-29T08-47-11Z_5a1c"}'
+
+4) Download Logs (CSV/JSON)
+# List logs
+curl http://localhost:5173/api/logs
+
+# Download a specific log
+curl -L "http://localhost:5173/api/logs/2025-08-29T08-47-11Z_5a1c.csv" -o run.csv
+
+🧠 Categories & Rules
+
+Default mapping (editable in utils/categories.js):
+
+Images: .png .jpg .jpeg .gif .webp .svg .heic
+
+Videos: .mp4 .mov .mkv .avi .webm
+
+Documents: .pdf .docx .doc .pptx .ppt .xlsx .xls .txt .md
+
+Audio: .mp3 .wav .aac .flac .m4a
+
+Archives: .zip .rar .7z .tar .gz
+
+Code: .c .cpp .js .ts .py .java .rb .go .rs .cs
+
+Executables: .exe .msi .apk .dmg .AppImage
+
+Misc: everything else
+
+You can override or extend the map per project.
+
+🔒 Safety
+
+Root-sandboxed: operations never cross outside the selected root.
+
+Preview-first: destructive actions disabled until a plan is confirmed.
+
+Atomic moves: every action is logged with timestamp + op id.
+
+Name collisions: resolves with suffixes (or prompts in UI).
+
+Long paths (Windows): normalized paths and \\?\ handling (where applicable).
+
+🚀 Performance Notes
+
+Streaming SHA-256 (no full file in RAM).
+
+Skip rehash by caching {size, mtime, hash}.
+
+Concurrency with a small worker pool (configurable via env).
+
+Very large sets: consider toggling a persistent store (SQLite/LevelDB) for hashes and resumable runs.
+
+✅ Testing (Suggested)
+npm run test
+
+
+Unit: planner, hasher, executor (atomicity), undo (idempotency)
+
+Integration: end-to-end preview → organize → undo on a temp directory (mock-fs helps)
+
+Windows + Linux in GitHub Actions matrix
+
+📦 Packaging (Optional)
+
+If you later add a desktop wrapper (e.g., Electron):
+
+Use electron-builder for Win/Linux/macOS targets
+
+Keep backend endpoints the same; call via IPC/HTTP from the renderer
+
+Add a strict Content-Security-Policy and disable nodeIntegration in the renderer
+
+🗺️ Roadmap
+
+ Rule editor (custom categories + destination templates)
+
+ Advanced duplicate policy (by folder preference, newest/oldest, size deltas)
+
+ Resume interrupted runs
+
+ Multi-root batch mode
+
+ i18n
+
+🤝 Contributing
+
+PRs welcome!
+
+Open an issue describing the change.
+
+Add tests for new logic.
+
+Run lint + tests before pushing.
+
+📄 License
+
+This project is released under the MIT License. See LICENSE
+ for details.
+
+💬 Support
+
+Questions or ideas? Open an issue on GitHub or start a discussion.
+Happy decluttering! 🧹✨
