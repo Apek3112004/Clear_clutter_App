@@ -199,3 +199,13 @@ button:hover, a:hover {
 #successModal button:hover {
   background-color: #45a049;
 }
+
+/* Ensure audio element does not affect layout */
+#successSound {
+  display: none;
+}
+
+/* Optional: add a subtle pop effect for confetti */
+.confetti-particle {
+  will-change: transform, opacity;
+}

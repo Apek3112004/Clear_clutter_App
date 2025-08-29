@@ -1,3 +1,4 @@
+// index.js
 import express from "express";
 import dotenv from "dotenv";
 import rateLimit from "express-rate-limit";
@@ -28,14 +29,15 @@ app.use(
     saveUninitialized: true,//Save new sessions even if unmodified.
     cookie: { secure: false },
     /*Sessions allow tracking user state across multiple requests. 
-    They are identified by a session ID cookie per client, so multiple tabs in the same browser share a session, while different browsers or devices get separate sessions.
+    They are identified by a session ID cookie per client, so multiple tabs in the same browser share a session, 
+    while different browsers or devices get separate sessions.
     In Electron, by default, multiple windows share the same session unless partitioning is used. */
   })
 );
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  max: 100,
   keyGenerator: (req) => req.sessionID, 
   message: "Too many requests from this session",
 });

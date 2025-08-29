@@ -16,6 +16,9 @@
 
     <h1>Clutter Clear</h1>
 
+    <!-- Error box for user-visible errors -->
+    <div id="error-message" role="alert" aria-live="assertive" class="error-box"></div>
+
     <!-- Folder path form -->
     <form id="pathForm">
       <label for="basepath">Enter folder path:</label>
@@ -35,15 +38,15 @@
       <section class="customization">
         <h3>Customize Organizing</h3>
 
-        <label>
+        <label for="excludeExt">
           Exclude extensions (comma separated):
-          <input type="text" id="excludeExt" placeholder="e.g. tmp,log" />
         </label>
+        <input type="text" id="excludeExt" placeholder="e.g. tmp,log" />
 
-        <label>
+        <label for="customFolders">
           Custom folder rules (format: ext=folder, comma separated):
-          <input type="text" id="customFolders" placeholder="e.g. png=Screenshots, mp3=Music" />
         </label>
+        <input type="text" id="customFolders" placeholder="e.g. png=Screenshots, mp3=Music" />
 
         <label>
           <input type="checkbox" id="copyInstead" />

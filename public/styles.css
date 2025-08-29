@@ -7,6 +7,19 @@
 }
 
 
+#error-message {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #ffe8e8;
+  color: #b00020;
+  font-weight: 600;
+}
+#error-message:empty {
+  display: none;
+}
+
+
 #progressFill {
   height: 100%;
   width: 0%;

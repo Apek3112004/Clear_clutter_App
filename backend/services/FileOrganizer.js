@@ -1,3 +1,4 @@
+// FileOrganizer.js 
 import fsn from "fs";
 import fs from "fs/promises";
 import path from "path";
@@ -37,7 +38,7 @@ export async function organizeFiles(
 
     let ext = path.extname(item).slice(1).toLowerCase();
     if (!ext) ext = "others"; // fallback for no-extension files
-    if (ext === "jpg") ext = "jpeg"; // normalize jpg → jpeg
+    // if (ext === "jpg") ext = "jpeg"; // normalize jpg → jpeg
 
     if (excludeExt.includes(ext) || ext === "js" || ext === "json") continue;
 

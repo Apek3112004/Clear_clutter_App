@@ -29,6 +29,7 @@ function createWindow() {
       /*Creates a window 1200x800 pixels.
       nodeIntegration: false + contextIsolation: true: Security best practices, 
       prevents renderer code from accessing Node directly. */
+      autoplayPolicy: 'no-user-gesture-required'
     },
   });
 
@@ -44,10 +45,8 @@ function createWindow() {
     mainWindow = null;
   });
 }
-/*Dev mode: Load frontend from React dev server (localhost:3000).
+/*Dev mode: Load frontend from dev server (localhost:3000).
 Packaged mode: Load the prebuilt HTML from the packaged app. */
-
-
 
 function waitForServer(url, timeout = 10000) {
 
@@ -76,7 +75,7 @@ function waitForServer(url, timeout = 10000) {
 
 
 electronApp.whenReady().then(async () => {
-  // ✅ Start backend server programmatically
+  // Start backend server 
   const PORT = process.env.PORT || 3000;
   server = backendApp.listen(PORT, () => {
     console.log(`Backend running on http://localhost:${PORT}`);
